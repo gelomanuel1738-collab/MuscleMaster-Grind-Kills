@@ -22,6 +22,12 @@ local ADMIN_NAMES = {
     "Cryptrix_4u",
 }
 
+-- DECLARE LABELS EARLY
+local hopLbl = nil
+local statusLbl = nil
+local targetLbl = nil
+local killLbl = nil
+
 local function isAdmin(plr)
     for _, adminName in ipairs(ADMIN_NAMES) do
         if plr.Name:lower() == adminName:lower() or
@@ -86,7 +92,9 @@ local function hopToSafeServer()
 
     if bestServer then
         currentJobId = bestServer.id
-        hopLbl.Text = "Joining " .. bestCount .. " player server..."
+        pcall(function()
+            if hopLbl then hopLbl.Text = "Joining " .. bestCount .. " player server..." end
+        end)
         task.wait(0.3)
         TeleportService:TeleportToPlaceInstance(game.PlaceId, bestServer.id, Player)
     else
@@ -310,7 +318,7 @@ titleLbl.TextSize = 14
 titleLbl.TextColor3 = Color3.fromRGB(220, 0, 255)
 titleLbl.Parent = frame
 
-local killLbl = Instance.new("TextLabel")
+killLbl = Instance.new("TextLabel")
 killLbl.Size = UDim2.new(1, 0, 0, 20)
 killLbl.Position = UDim2.new(0, 0, 0, 22)
 killLbl.BackgroundTransparency = 1
@@ -320,7 +328,7 @@ killLbl.TextSize = 13
 killLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
 killLbl.Parent = frame
 
-local targetLbl = Instance.new("TextLabel")
+targetLbl = Instance.new("TextLabel")
 targetLbl.Size = UDim2.new(1, 0, 0, 20)
 targetLbl.Position = UDim2.new(0, 0, 0, 42)
 targetLbl.BackgroundTransparency = 1
@@ -330,7 +338,7 @@ targetLbl.TextSize = 12
 targetLbl.TextColor3 = Color3.fromRGB(255, 200, 100)
 targetLbl.Parent = frame
 
-local statusLbl = Instance.new("TextLabel")
+statusLbl = Instance.new("TextLabel")
 statusLbl.Size = UDim2.new(1, 0, 0, 20)
 statusLbl.Position = UDim2.new(0, 0, 0, 62)
 statusLbl.BackgroundTransparency = 1
@@ -340,7 +348,7 @@ statusLbl.TextSize = 12
 statusLbl.TextColor3 = Color3.fromRGB(180, 180, 255)
 statusLbl.Parent = frame
 
-local hopLbl = Instance.new("TextLabel")
+hopLbl = Instance.new("TextLabel")
 hopLbl.Size = UDim2.new(1, 0, 0, 20)
 hopLbl.Position = UDim2.new(0, 0, 0, 82)
 hopLbl.BackgroundTransparency = 1
@@ -424,12 +432,14 @@ task.spawn(function()
     while true do
         task.wait(1)
         countdown = countdown - 1
-        if not isHopping then
-            hopLbl.Text = "Server Hop: " .. countdown .. "s"
-        end
+        pcall(function()
+            if hopLbl and not isHopping then
+                hopLbl.Text = "Server Hop: " .. countdown .. "s"
+            end
+        end)
         if countdown <= 0 then
-            hopToSafeServer()
             countdown = 40
+            hopToSafeServer()
         end
     end
 end)
@@ -442,9 +452,13 @@ task.spawn(function()
         if not isHopping then
             local adminFound, foundName = hasAdminInServer()
             if adminFound then
-                statusLbl.Text = "⚠️ " .. (foundName or "ADMIN") .. " DETECTED!"
-                statusLbl.TextColor3 = Color3.fromRGB(255, 50, 50)
-                hopLbl.Text = "HOPPING NOW!"
+                pcall(function()
+                    if statusLbl then
+                        statusLbl.Text = "⚠️ " .. (foundName or "ADMIN") .. " DETECTED!"
+                        statusLbl.TextColor3 = Color3.fromRGB(255, 50, 50)
+                    end
+                    if hopLbl then hopLbl.Text = "HOPPING NOW!" end
+                end)
                 hopToSafeServer()
             end
         end
@@ -462,25 +476,37 @@ task.spawn(function()
     while true do
         task.wait(0.008)
 
-        if isHopping then task.wait(0.5) continue end
+        if isHopping then
+            task.wait(1)
+            continue
+        end
 
         local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
         local myHum  = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
         if not myRoot or not myHum or myHum.Health <= 0 then
-            task.wait(0.5) continue
+            task.wait(0.5)
+            continue
         end
 
         local stopped, moving = getStoppedTargets()
 
         if #stopped == 0 then
             if #moving > 0 then
-                statusLbl.Text = "Waiting for stop..."
-                statusLbl.TextColor3 = Color3.fromRGB(255, 200, 0)
-                targetLbl.Text = "Target: —"
+                pcall(function()
+                    if statusLbl then
+                        statusLbl.Text = "Waiting for stop..."
+                        statusLbl.TextColor3 = Color3.fromRGB(255, 200, 0)
+                    end
+                    if targetLbl then targetLbl.Text = "Target: —" end
+                end)
             else
-                statusLbl.Text = "No players..."
-                statusLbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-                targetLbl.Text = "Target: —"
+                pcall(function()
+                    if statusLbl then
+                        statusLbl.Text = "No players..."
+                        statusLbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+                    end
+                    if targetLbl then targetLbl.Text = "Target: —" end
+                end)
             end
             task.wait(0.1)
             continue
@@ -496,9 +522,13 @@ task.spawn(function()
 
             if not hum or not tRoot then continue end
 
-            targetLbl.Text = "Target: " .. plr.DisplayName
-            statusLbl.Text = "⚔️ Killing..."
-            statusLbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+            pcall(function()
+                if targetLbl then targetLbl.Text = "Target: " .. plr.DisplayName end
+                if statusLbl then
+                    statusLbl.Text = "⚔️ Killing..."
+                    statusLbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+                end
+            end)
 
             while hum and hum.Health > 0 and tRoot and tRoot.Parent do
                 task.wait(0.008)
@@ -512,9 +542,13 @@ task.spawn(function()
                 if not myR or not myH or myH.Health <= 0 then break end
 
                 if not isPlayerStopped(plr) then
-                    statusLbl.Text = "Target moved, switching..."
-                    statusLbl.TextColor3 = Color3.fromRGB(255, 165, 0)
-                    targetLbl.Text = "Target: —"
+                    pcall(function()
+                        if statusLbl then
+                            statusLbl.Text = "Target moved, switching..."
+                            statusLbl.TextColor3 = Color3.fromRGB(255, 165, 0)
+                        end
+                        if targetLbl then targetLbl.Text = "Target: —" end
+                    end)
                     task.wait(0.1)
                     break
                 end
