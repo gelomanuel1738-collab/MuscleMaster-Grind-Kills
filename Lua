@@ -14,6 +14,7 @@ local handIndex = 1
 local whitelist = {}
 local sessionKills = 0
 local currentJobId = game.JobId
+local isHopping = false
 
 local STOP_THRESHOLD = 3
 
@@ -21,17 +22,27 @@ local ADMIN_NAMES = {
     "Cryptrix_4u",
 }
 
+local function isAdmin(plr)
+    for _, adminName in ipairs(ADMIN_NAMES) do
+        if plr.Name:lower() == adminName:lower() or
+           plr.DisplayName:lower() == adminName:lower() then
+            return true
+        end
+    end
+    if plr.UserId == 7795879719 then
+        return true
+    end
+    local isAdminVal = plr:FindFirstChild("IsAdmin")
+    if isAdminVal and isAdminVal.Value == true then
+        return true
+    end
+    return false
+end
+
 local function hasAdminInServer()
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= Player then
-            for _, adminName in ipairs(ADMIN_NAMES) do
-                if plr.Name:lower() == adminName:lower() or
-                   plr.DisplayName:lower() == adminName:lower() then
-                    return true, plr.Name
-                end
-            end
-            local isAdmin = plr:FindFirstChild("IsAdmin")
-            if isAdmin and isAdmin.Value == true then
+            if isAdmin(plr) then
                 return true, plr.Name
             end
         end
@@ -40,39 +51,49 @@ local function hasAdminInServer()
 end
 
 local function hopToSafeServer()
+    if isHopping then return end
+    isHopping = true
+
     local found = false
     local attempts = 0
+    local bestServer = nil
+    local bestCount = 0
 
-    while not found and attempts < 15 do
+    while not found and attempts < 5 do
         attempts = attempts + 1
         pcall(function()
-            local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+            local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
             local response = game:HttpGet(url)
             local data = HttpService:JSONDecode(response)
             if data and data.data then
-                local servers = data.data
-                for i = #servers, 2, -1 do
-                    local j = math.random(1, i)
-                    servers[i], servers[j] = servers[j], servers[i]
-                end
-                for _, server in ipairs(servers) do
+                for _, server in ipairs(data.data) do
                     if server.id ~= currentJobId
                     and server.playing ~= nil
                     and server.maxPlayers ~= nil
-                    and server.playing < server.maxPlayers then
-                        found = true
-                        TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, Player)
-                        break
+                    and server.playing < server.maxPlayers
+                    and server.playing > bestCount then
+                        bestServer = server
+                        bestCount = server.playing
                     end
+                end
+                if bestServer then
+                    found = true
                 end
             end
         end)
         if not found then task.wait(1) end
     end
 
-    if not found then
+    if bestServer then
+        currentJobId = bestServer.id
+        hopLbl.Text = "Joining " .. bestCount .. " player server..."
+        task.wait(0.3)
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, bestServer.id, Player)
+    else
         pcall(function() TeleportService:Teleport(game.PlaceId, Player) end)
     end
+
+    isHopping = false
 end
 
 -- =====================
@@ -123,7 +144,7 @@ local checkSub = Instance.new("TextLabel")
 checkSub.Size = UDim2.new(1, 0, 0, 18)
 checkSub.Position = UDim2.new(0, 0, 0, 62)
 checkSub.BackgroundTransparency = 1
-checkSub.Text = "SCANNING FOR ADMINS/DEVS..."
+checkSub.Text = "SCANNING FOR CRYPTRIX_4U..."
 checkSub.Font = Enum.Font.LuckiestGuy
 checkSub.TextSize = 11
 checkSub.TextColor3 = Color3.fromRGB(140, 100, 200)
@@ -133,50 +154,41 @@ task.spawn(function()
     local hue = 0
     while checkGui and checkGui.Parent do
         hue = (hue + 0.004) % 1
-        pcall(function()
-            checkStroke.Color = Color3.fromHSV(hue, 1, 1)
-        end)
+        pcall(function() checkStroke.Color = Color3.fromHSV(hue, 1, 1) end)
         task.wait(0.05)
     end
 end)
 
--- INSTANT CHECK ON EXECUTE
 task.wait(3)
 local adminFound, adminName = hasAdminInServer()
 
 if adminFound then
-    checkStatus.Text = "⚠️ ADMIN DETECTED!"
+    checkStatus.Text = "⚠️ ADMIN DETECTED! HOPPING..."
     checkStatus.TextColor3 = Color3.fromRGB(255, 50, 50)
-    checkSub.Text = "HOPPING TO SAFE SERVER..."
-    checkSub.TextColor3 = Color3.fromRGB(255, 100, 100)
-    task.wait(0.5)
+    checkSub.Text = "FOUND: " .. (adminName or "ADMIN")
+    task.wait(0.3)
     checkGui:Destroy()
     hopToSafeServer()
 else
     checkStatus.Text = "✅ SERVER IS SAFE!"
     checkStatus.TextColor3 = Color3.fromRGB(0, 255, 120)
     checkSub.Text = "LOADING SCRIPT..."
-    checkSub.TextColor3 = Color3.fromRGB(100, 255, 150)
     task.wait(1)
     checkGui:Destroy()
 end
 
 -- INSTANT HOP PAG NAG JOIN SI ADMIN
 Players.PlayerAdded:Connect(function(plr)
-    -- Check by name agad
-    for _, adminName in ipairs(ADMIN_NAMES) do
-        if plr.Name:lower() == adminName:lower() or
-           plr.DisplayName:lower() == adminName:lower() then
-            hopToSafeServer()
-            return
-        end
-    end
-    -- Check IsAdmin value
-    task.wait(1)
-    local isAdmin = plr:FindFirstChild("IsAdmin")
-    if isAdmin and isAdmin.Value == true then
+    if isAdmin(plr) then
         hopToSafeServer()
+        return
     end
+    task.spawn(function()
+        task.wait(1)
+        if isAdmin(plr) then
+            hopToSafeServer()
+        end
+    end)
 end)
 
 -- =====================
@@ -237,7 +249,7 @@ local function getStoppedTargets()
     local stopped = {}
     local moving = {}
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= Player and not whitelist[plr.UserId] then
+        if plr ~= Player and not whitelist[plr.UserId] and not isAdmin(plr) then
             local tc = plr.Character
             if tc then
                 local hum   = tc:FindFirstChild("Humanoid")
@@ -412,7 +424,9 @@ task.spawn(function()
     while true do
         task.wait(1)
         countdown = countdown - 1
-        hopLbl.Text = "Server Hop: " .. countdown .. "s"
+        if not isHopping then
+            hopLbl.Text = "Server Hop: " .. countdown .. "s"
+        end
         if countdown <= 0 then
             hopToSafeServer()
             countdown = 40
@@ -420,17 +434,19 @@ task.spawn(function()
     end
 end)
 
--- ADMIN CHECK EVERY 3 SECONDS
+-- CONTINUOUS ADMIN CHECK EVERY 1 SECOND
 task.spawn(function()
     task.wait(5)
     while true do
-        task.wait(3)
-        local adminFound, _ = hasAdminInServer()
-        if adminFound then
-            statusLbl.Text = "⚠️ ADMIN DETECTED!"
-            statusLbl.TextColor3 = Color3.fromRGB(255, 50, 50)
-            hopLbl.Text = "HOPPING NOW..."
-            hopToSafeServer()
+        task.wait(1)
+        if not isHopping then
+            local adminFound, foundName = hasAdminInServer()
+            if adminFound then
+                statusLbl.Text = "⚠️ " .. (foundName or "ADMIN") .. " DETECTED!"
+                statusLbl.TextColor3 = Color3.fromRGB(255, 50, 50)
+                hopLbl.Text = "HOPPING NOW!"
+                hopToSafeServer()
+            end
         end
     end
 end)
@@ -445,6 +461,8 @@ end)
 task.spawn(function()
     while true do
         task.wait(0.008)
+
+        if isHopping then task.wait(0.5) continue end
 
         local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
         local myHum  = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
@@ -470,6 +488,7 @@ task.spawn(function()
 
         for _, plr in ipairs(stopped) do
             if whitelist[plr.UserId] then continue end
+            if isAdmin(plr) then continue end
 
             local tc    = plr.Character
             local hum   = tc and tc:FindFirstChild("Humanoid")
@@ -484,7 +503,9 @@ task.spawn(function()
             while hum and hum.Health > 0 and tRoot and tRoot.Parent do
                 task.wait(0.008)
 
+                if isHopping then break end
                 if whitelist[plr.UserId] then break end
+                if isAdmin(plr) then break end
 
                 local myR = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                 local myH = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
