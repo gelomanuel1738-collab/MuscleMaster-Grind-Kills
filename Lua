@@ -15,6 +15,8 @@ local whitelist = {}
 local sessionKills = 0
 local currentJobId = game.JobId
 local isHopping = false
+local visitedServers = {}
+visitedServers[game.JobId] = true
 
 local STOP_THRESHOLD = 3
 
@@ -73,7 +75,7 @@ local function hopToSafeServer()
             local data = HttpService:JSONDecode(response)
             if data and data.data then
                 for _, server in ipairs(data.data) do
-                    if server.id ~= currentJobId
+                    if not visitedServers[server.id]
                     and server.playing ~= nil
                     and server.maxPlayers ~= nil
                     and server.playing < server.maxPlayers
@@ -91,6 +93,7 @@ local function hopToSafeServer()
     end
 
     if bestServer then
+        visitedServers[bestServer.id] = true
         currentJobId = bestServer.id
         pcall(function()
             if hopLbl then hopLbl.Text = "Joining " .. bestCount .. " player server..." end
@@ -98,6 +101,9 @@ local function hopToSafeServer()
         task.wait(0.3)
         TeleportService:TeleportToPlaceInstance(game.PlaceId, bestServer.id, Player)
     else
+        -- Reset visited list pag wala nang bagong server
+        visitedServers = {}
+        visitedServers[currentJobId] = true
         pcall(function() TeleportService:Teleport(game.PlaceId, Player) end)
     end
 
@@ -383,7 +389,9 @@ local function trackPlayer(plr)
         hum.Died:Connect(function()
             if not whitelist[plr.UserId] then
                 sessionKills = sessionKills + 1
-                killLbl.Text = "Total Kills: " .. sessionKills
+                pcall(function()
+                    if killLbl then killLbl.Text = "Total Kills: " .. sessionKills end
+                end)
             end
         end)
     end)
@@ -394,7 +402,9 @@ local function trackPlayer(plr)
             hum.Died:Connect(function()
                 if not whitelist[plr.UserId] then
                     sessionKills = sessionKills + 1
-                    killLbl.Text = "Total Kills: " .. sessionKills
+                    pcall(function()
+                        if killLbl then killLbl.Text = "Total Kills: " .. sessionKills end
+                    end)
                 end
             end)
         end
