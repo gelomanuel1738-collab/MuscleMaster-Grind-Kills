@@ -29,6 +29,85 @@ local statusLbl = nil
 local targetLbl = nil
 local killLbl = nil
 
+-- =====================
+-- ANTI LAG + FPS BOOST
+-- =====================
+local function applyAntiLag()
+    pcall(function()
+        local L = game:GetService("Lighting")
+        L.GlobalShadows = false
+        L.Brightness = 0
+        L.FogEnd = 9e9
+        L.Ambient = Color3.fromRGB(0,0,0)
+        L.OutdoorAmbient = Color3.fromRGB(0,0,0)
+        L.ClockTime = 0
+        for _, v in ipairs(L:GetChildren()) do
+            if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or
+               v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or
+               v:IsA("DepthOfFieldEffect") or v:IsA("Atmosphere") then
+                v.Enabled = false
+            end
+        end
+    end)
+    pcall(function() settings().Rendering.QualityLevel = 1 end)
+    pcall(function()
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Trail") or
+               v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+                v.Enabled = false
+            end
+        end
+    end)
+    pcall(function()
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Decal") or v:IsA("Texture") then
+                v.Transparency = 1
+            end
+        end
+    end)
+    pcall(function()
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("SpecialMesh") then
+                v.TextureId = ""
+            end
+        end
+    end)
+    pcall(function()
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CastShadow = false
+            end
+        end
+    end)
+end
+
+applyAntiLag()
+
+task.spawn(function()
+    while true do
+        task.wait(5)
+        applyAntiLag()
+    end
+end)
+
+workspace.DescendantAdded:Connect(function(v)
+    pcall(function()
+        if v:IsA("ParticleEmitter") or v:IsA("Trail") or
+           v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+            v.Enabled = false
+        end
+        if v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        end
+        if v:IsA("BasePart") then
+            v.CastShadow = false
+        end
+    end)
+end)
+
+-- =====================
+-- ADMIN FUNCTIONS
+-- =====================
 local function isAdmin(plr)
     for _, adminName in ipairs(ADMIN_NAMES) do
         if plr.Name:lower() == adminName:lower() or
@@ -105,7 +184,6 @@ local function hopToSafeServer()
     end
 
     if not found then
-        -- Fallback kahit anong server basta hindi current
         pcall(function()
             local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
             local response = game:HttpGet(url)
